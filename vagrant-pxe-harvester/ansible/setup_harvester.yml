@@ -44,11 +44,29 @@
     retries: 10
     delay: 30
 
-  - name: boot Harvester nodes
+  - name: boot first Harvester node 
+    include: boot_harvester_node.yml
+    vars:
+      node_number: "0"
+
+  - name: boot remaining Harvester nodes
     include: boot_harvester_node.yml
     vars:
       node_number: "{{ item }}"
-    with_sequence: 0-{{ harvester_cluster_nodes|int - 1 }}
+    with_sequence: 1-{{ harvester_cluster_nodes|int - 1 }}
+    when: harvester_cluster_nodes | int > 1
+    register: _create_remaining_harvester_nodes
+    async: 2400 
+    poll: 0  
+
+  - name: Wait for Harvester remaining nodes creation
+    async_status:
+      jid: "{{ item.ansible_job_id }}"
+    register: _jobs
+    until: _jobs.finished
+    delay: 120
+    retries: 20 
+    with_items: "{{ _create_remaining_harvester_nodes.results }}"
 
   - name: create "Installation Completed" message
     shell: >
